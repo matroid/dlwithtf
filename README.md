@@ -1,2 +1,2 @@
-# dlwithtf
-Deep Learning with TensorFlow Book
+# The Book
+Deep Learning with TensorFlow

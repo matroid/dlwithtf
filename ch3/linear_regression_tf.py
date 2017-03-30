@@ -26,7 +26,6 @@ plt.ylabel("y")
 plt.title("Raw Linear Regression Data")
 plt.savefig("lr_data.png")
 
-
 # Generate tensorflow graph
 with tf.name_scope("placeholders"):
   x = tf.placeholder(tf.float32, (N, d))

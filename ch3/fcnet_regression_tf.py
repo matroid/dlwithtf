@@ -11,7 +11,7 @@ def pearson_r2_score(y, y_pred):
 
 # Generate synthetic data
 d = 1
-N = 100
+N = 50
 w_true = 5
 b_true = 2
 noise_scale = .1
@@ -23,19 +23,22 @@ y_np = np.reshape(w_true * x_np  + b_true + noise, (-1))
 plt.scatter(x_np, y_np)
 plt.xlabel("X")
 plt.ylabel("y")
-plt.xlim(0, 1)
 plt.title("Raw Linear Regression Data")
-plt.savefig("lr_data.png")
+plt.savefig("fcnet_data.png")
 
 # Generate tensorflow graph
+n_hidden = 15
 with tf.name_scope("placeholders"):
   x = tf.placeholder(tf.float32, (N, d))
   y = tf.placeholder(tf.float32, (N,))
-with tf.name_scope("weights"):
-  W = tf.Variable(tf.random_normal((d, 1)))
+with tf.name_scope("layer-1"):
+  W = tf.Variable(tf.random_normal((d, n_hidden)))
+  b = tf.Variable(tf.random_normal((n_hidden,)))
+  x_1 = tf.nn.relu(tf.matmul(x, W) + b)
+with tf.name_scope("output"):
+  W = tf.Variable(tf.random_normal((n_hidden, 1)))
   b = tf.Variable(tf.random_normal((1,)))
-with tf.name_scope("prediction"):
-  y_pred = tf.matmul(x, W) + b
+  y_pred = tf.matmul(x_1, W) + b
 with tf.name_scope("loss"):
   l = tf.reduce_sum((y - y_pred)**2)
 with tf.name_scope("optim"):
@@ -45,9 +48,9 @@ with tf.name_scope("summaries"):
   tf.summary.scalar("loss", l)
   merged = tf.summary.merge_all()
 
-train_writer = tf.summary.FileWriter('/tmp/lr-train', tf.get_default_graph())
+train_writer = tf.summary.FileWriter('/tmp/fcnet-train', tf.get_default_graph())
 
-n_steps = 1000
+n_steps = 200
 with tf.Session() as sess:
   sess.run(tf.global_variables_initializer())
   # Train model
@@ -56,9 +59,6 @@ with tf.Session() as sess:
     _, summary, loss = sess.run([train_op, merged, l], feed_dict=feed_dict)
     print("step %d, loss: %f" % (i, loss))
     train_writer.add_summary(summary, i)
-
-  # Get weights
-  w_final, b_final = sess.run([W, b])
 
   # Make Predictions
   y_pred_np = sess.run(y_pred, feed_dict={x: x_np})
@@ -73,7 +73,7 @@ plt.xlabel("Y-true")
 plt.ylabel("Y-pred")
 plt.title("Predicted versus true values")
 plt.scatter(y_np, y_pred_np)
-plt.savefig("lr_pred.png")
+plt.savefig("fcnet_pred.png")
 
 # Now draw with learned regression line
 plt.clf()
@@ -81,10 +81,5 @@ plt.xlabel("X")
 plt.ylabel("Y")
 plt.title("Predicted versus true values")
 plt.xlim(0, 1)
-plt.scatter(x_np, y_np)
-x_left = 0
-y_left = w_final[0]*x_left + b_final
-x_right = 1
-y_right = w_final[0]*x_right + b_final
-plt.plot([x_left, x_right], [y_left, y_right], color='k')
-plt.savefig("lr_learned.png")
+plt.scatter(x_np, y_pred_np)
+plt.savefig("fcnet_learned.png")

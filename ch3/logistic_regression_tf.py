@@ -4,6 +4,7 @@ import  tensorflow as tf
 tf.set_random_seed(456)
 import matplotlib.pyplot as plt
 from sklearn.metrics import accuracy_score
+from scipy.special import logit
 
 # Generate synthetic data
 N = 100
@@ -71,8 +72,32 @@ with tf.Session() as sess:
     print("loss: %f" % loss)
     train_writer.add_summary(summary, i)
 
+  # Get weights
+  w_final, b_final = sess.run([W, b])
+
   # Make Predictions
   y_pred_np = sess.run(y_pred, feed_dict={x: x_np})
 
 score = accuracy_score(y_np, y_pred_np)
 print("Classification Accuracy: %f" % score)
+
+plt.clf()
+# Save image of the data distribution
+plt.xlabel("Dimension 1")
+plt.ylabel("Dimension 2")
+plt.title("Logistic Regression Data")
+plt.xlim(-2, 2)
+plt.ylim(-2, 2)
+
+# Plot Zeros
+plt.scatter(x_zeros[:, 0], x_zeros[:, 1], color="blue")
+plt.scatter(x_ones[:, 0], x_ones[:, 1], color="red")
+
+x_left = -2
+y_left = (1./w_final[1]) * (-b_final + logit(.5) - w_final[0]*x_left)
+
+x_right = 2
+y_right = (1./w_final[1]) * (-b_final + logit(.5) - w_final[0]*x_right)
+plt.plot([x_left, x_right], [y_left, y_right], color='k')
+
+plt.savefig("logistic_pred.png")

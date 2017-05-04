@@ -8,9 +8,6 @@ from scipy.special import logit
 
 # Generate synthetic data
 N = 100
-w_true = 5
-b_true = 2
-noise_scale = .1
 # Zeros form a Gaussian centered at (-1, -1)
 x_zeros = np.random.multivariate_normal(
     mean=np.array((-1, -1)), cov=.1*np.eye(2), size=(N/2,))
@@ -24,9 +21,9 @@ x_np = np.vstack([x_zeros, x_ones])
 y_np = np.concatenate([y_zeros, y_ones])
 
 # Save image of the data distribution
-plt.xlabel("Dimension 1")
-plt.ylabel("Dimension 2")
-plt.title("Logistic Regression Data")
+plt.xlabel(r"$x_1$")
+plt.ylabel(r"$x_2$")
+plt.title("Toy Logistic Regression Data")
 
 # Plot Zeros
 plt.scatter(x_zeros[:, 0], x_zeros[:, 1], color="blue")
@@ -44,7 +41,6 @@ with tf.name_scope("prediction"):
   y_logit = tf.squeeze(tf.matmul(x, W) + b)
   # the sigmoid gives the class probability of 1
   y_one_prob = tf.sigmoid(y_logit)
-
   # Rounding P(y=1) will give the correct prediction.
   y_pred = tf.round(y_one_prob)
 
@@ -83,9 +79,9 @@ print("Classification Accuracy: %f" % score)
 
 plt.clf()
 # Save image of the data distribution
-plt.xlabel("Dimension 1")
-plt.ylabel("Dimension 2")
-plt.title("Logistic Regression Data")
+plt.xlabel(r"$x_1$")
+plt.ylabel(r"$x_2$")
+plt.title("Learned Model (Classification Accuracy: 1.00)")
 plt.xlim(-2, 2)
 plt.ylim(-2, 2)
 

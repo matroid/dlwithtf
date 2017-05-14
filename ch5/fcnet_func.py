@@ -6,16 +6,19 @@ import matplotlib.pyplot as plt
 import deepchem as dc
 from sklearn.metrics import accuracy_score
 
-def eval_tox21_hyperparams(n_hidden=50, learning_rate=.001,
-                           n_epochs=45, batch_size=100, weight_positives=True):
+def eval_tox21_hyperparams(n_hidden=50, n_layers=1, learning_rate=.001,
+                           dropout_prob=0.5, n_epochs=45, batch_size=100,
+                           weight_positives=True):
 
   print("---------------------------------------------")
   print("Model hyperparameters")
   print("n_hidden = %d" % n_hidden)
+  print("n_layers = %d" % n_layers)
   print("learning_rate = %f" % learning_rate)
   print("n_epochs = %d" % n_epochs)
   print("batch_size = %d" % batch_size)
   print("weight_positives = %s" % str(weight_positives))
+  print("dropout_prob = %f" % dropout_prob)
   print("---------------------------------------------")
 
   d = 1024
@@ -39,14 +42,18 @@ def eval_tox21_hyperparams(n_hidden=50, learning_rate=.001,
       x = tf.placeholder(tf.float32, (None, d))
       y = tf.placeholder(tf.float32, (None,))
       w = tf.placeholder(tf.float32, (None,))
-    with tf.name_scope("layer-1"):
-      W = tf.Variable(tf.random_normal((d, n_hidden)))
-      b = tf.Variable(tf.random_normal((n_hidden,)))
-      x_1 = tf.nn.relu(tf.matmul(x, W) + b)
+      keep_prob = tf.placeholder(tf.float32)
+    for layer in range(n_layers):
+      with tf.name_scope("layer-%d" % layer):
+        W = tf.Variable(tf.random_normal((d, n_hidden)))
+        b = tf.Variable(tf.random_normal((n_hidden,)))
+        x_hidden = tf.nn.relu(tf.matmul(x, W) + b)
+        # Apply dropout
+        x_hidden = tf.nn.dropout(x_hidden, keep_prob)
     with tf.name_scope("output"):
       W = tf.Variable(tf.random_normal((n_hidden, 1)))
       b = tf.Variable(tf.random_normal((1,)))
-      y_logit = tf.matmul(x_1, W) + b
+      y_logit = tf.matmul(x_hidden, W) + b
       # the sigmoid gives the class probability of 1
       y_one_prob = tf.sigmoid(y_logit)
       # Rounding P(y=1) will give the correct prediction.
@@ -83,7 +90,7 @@ def eval_tox21_hyperparams(n_hidden=50, learning_rate=.001,
           batch_X = train_X[pos:pos+batch_size]
           batch_y = train_y[pos:pos+batch_size]
           batch_w = train_w[pos:pos+batch_size]
-          feed_dict = {x: batch_X, y: batch_y, w: batch_w}
+          feed_dict = {x: batch_X, y: batch_y, w: batch_w, keep_prob: dropout_prob}
           _, summary, loss = sess.run([train_op, merged, l], feed_dict=feed_dict)
           print("epoch %d, step %d, loss: %f" % (epoch, step, loss))
           train_writer.add_summary(summary, step)
@@ -91,11 +98,11 @@ def eval_tox21_hyperparams(n_hidden=50, learning_rate=.001,
           step += 1
           pos += batch_size
 
-      # Make Predictions
-      valid_y_pred = sess.run(y_pred, feed_dict={x: valid_X})
+      # Make Predictions (set keep_prob to 1.0 for predictions)
+      valid_y_pred = sess.run(y_pred, feed_dict={x: valid_X, keep_prob: 1.0})
 
     weighted_score = accuracy_score(valid_y, valid_y_pred, sample_weight=valid_w)
-    print("Weighted Classification Accuracy: %f" % weighted_score)
+    print("Valid Weighted Classification Accuracy: %f" % weighted_score)
   return weighted_score
 
 if __name__ == "__main__":

@@ -2,10 +2,10 @@ import numpy as np
 from fcnet_func import eval_tox21_hyperparams
 
 scores = {}
-n_reps = 3
-hidden_sizes = [30, 60]
-epochs = [15, 30, 45]
-dropouts = [.5]
+n_reps = 1
+hidden_sizes = [50]
+epochs = [10]
+dropouts = [.5, 1.0]
 num_layers = [1, 2]
 
 for rep in range(n_reps):

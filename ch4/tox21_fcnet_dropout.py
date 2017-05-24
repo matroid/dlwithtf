@@ -32,16 +32,16 @@ with tf.name_scope("placeholders"):
   x = tf.placeholder(tf.float32, (None, d))
   y = tf.placeholder(tf.float32, (None,))
   keep_prob = tf.placeholder(tf.float32)
-with tf.name_scope("layer-1"):
+with tf.name_scope("hidden-layer"):
   W = tf.Variable(tf.random_normal((d, n_hidden)))
   b = tf.Variable(tf.random_normal((n_hidden,)))
-  x_1 = tf.nn.relu(tf.matmul(x, W) + b)
+  x_hidden = tf.nn.relu(tf.matmul(x, W) + b)
   # Apply dropout
-  x_1 = tf.nn.dropout(x_1, keep_prob)
+  x_hidden = tf.nn.dropout(x_hidden, keep_prob)
 with tf.name_scope("output"):
   W = tf.Variable(tf.random_normal((n_hidden, 1)))
   b = tf.Variable(tf.random_normal((1,)))
-  y_logit = tf.matmul(x_1, W) + b
+  y_logit = tf.matmul(x_hidden, W) + b
   # the sigmoid gives the class probability of 1
   y_one_prob = tf.sigmoid(y_logit)
   # Rounding P(y=1) will give the correct prediction.
@@ -60,7 +60,7 @@ with tf.name_scope("summaries"):
   tf.summary.scalar("loss", l)
   merged = tf.summary.merge_all()
 
-train_writer = tf.summary.FileWriter('/tmp/fcnet-tox21',
+train_writer = tf.summary.FileWriter('/tmp/fcnet-tox21-dropout',
                                      tf.get_default_graph())
 N = train_X.shape[0]
 with tf.Session() as sess:
@@ -82,8 +82,11 @@ with tf.Session() as sess:
   # Make Predictions (set keep_prob to 1.0 for predictions)
   train_y_pred = sess.run(y_pred, feed_dict={x: train_X, keep_prob: 1.0})
   valid_y_pred = sess.run(y_pred, feed_dict={x: valid_X, keep_prob: 1.0})
+  test_y_pred = sess.run(y_pred, feed_dict={x: test_X, keep_prob: 1.0})
 
 train_weighted_score = accuracy_score(train_y, train_y_pred, sample_weight=train_w)
 print("Train Weighted Classification Accuracy: %f" % train_weighted_score)
 valid_weighted_score = accuracy_score(valid_y, valid_y_pred, sample_weight=valid_w)
 print("Valid Weighted Classification Accuracy: %f" % valid_weighted_score)
+test_weighted_score = accuracy_score(test_y, test_y_pred, sample_weight=test_w)
+print("Test Weighted Classification Accuracy: %f" % test_weighted_score)

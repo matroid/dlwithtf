@@ -30,14 +30,14 @@ batch_size = 100
 with tf.name_scope("placeholders"):
   x = tf.placeholder(tf.float32, (None, d))
   y = tf.placeholder(tf.float32, (None,))
-with tf.name_scope("layer-1"):
+with tf.name_scope("hidden-layer"):
   W = tf.Variable(tf.random_normal((d, n_hidden)))
   b = tf.Variable(tf.random_normal((n_hidden,)))
-  x_1 = tf.nn.relu(tf.matmul(x, W) + b)
+  x_hidden = tf.nn.relu(tf.matmul(x, W) + b)
 with tf.name_scope("output"):
   W = tf.Variable(tf.random_normal((n_hidden, 1)))
   b = tf.Variable(tf.random_normal((1,)))
-  y_logit = tf.matmul(x_1, W) + b
+  y_logit = tf.matmul(x_hidden, W) + b
   # the sigmoid gives the class probability of 1
   y_one_prob = tf.sigmoid(y_logit)
   # Rounding P(y=1) will give the correct prediction.

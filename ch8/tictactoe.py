@@ -15,7 +15,6 @@ from a3c import A3C
 
 
 class TicTacToePolicy(dc.rl.Policy):
-
   def create_layers(self, state, **kwargs):
     d1 = Flatten(in_layers=state)
     d2 = Dense(
@@ -49,10 +48,10 @@ def eval_tic_tac_toe(value_weight,
                      games=10**4,
                      rollouts=10**5):
   """
-    Returns the average reward over 1k games after 10k rollouts
-    :param value_weight:
-    :return:
-    """
+  Returns the average reward over 10k games after 100k rollouts
+  :param value_weight:
+  :return:
+  """
   env = TicTacToeEnvironment()
   policy = TicTacToePolicy()
   model_dir = "/tmp/tictactoe"
@@ -63,6 +62,7 @@ def eval_tic_tac_toe(value_weight,
 
   avg_rewards = []
   for j in range(num_epoch_rounds):
+    print("Epoch round: %d" % j)
     a3c_engine = A3C(
         env,
         policy,
@@ -84,15 +84,17 @@ def eval_tic_tac_toe(value_weight,
         action = a3c_engine.select_action(env._state)
         reward = env.step(action)
       rewards.append(reward)
+    print("Mean reward at round %d is %f" % (j+1, np.mean(rewards)))
     avg_rewards.append({(j + 1) * rollouts: np.mean(rewards)})
   return avg_rewards
 
 
 def main():
   value_weight = 6.0
-  score = eval_tic_tac_toe(value_weight, num_epoch_rounds=3)
+  score = eval_tic_tac_toe(value_weight, num_epoch_rounds=20,
+                           games=10**4, rollouts=5*10**4)
   print(score)
 
 
 if __name__ == "__main__":
-  main()
+    main()

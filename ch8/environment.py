@@ -7,8 +7,8 @@ import deepchem as dc
 
 class TicTacToeEnvironment(dc.rl.Environment):
   """
-    Play tictactoe against a randomly acting opponent
-    """
+  Play tictactoe against a randomly acting opponent
+  """
   X = np.array([1.0, 0.0])
   O = np.array([0.0, 1.0])
   EMPTY = np.array([0.0, 0.0])

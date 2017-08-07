@@ -2,7 +2,7 @@ import numpy as np
 from fcnet_func import eval_tox21_hyperparams
 
 scores = {}
-n_reps = 1
+n_reps = 3
 hidden_sizes = [50]
 epochs = [10]
 dropouts = [.5, 1.0]

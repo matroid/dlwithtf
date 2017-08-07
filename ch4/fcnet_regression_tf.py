@@ -24,7 +24,7 @@ plt.scatter(x_np, y_np)
 plt.xlabel("X")
 plt.ylabel("y")
 plt.title("Raw Linear Regression Data")
-plt.savefig("fcnet_data.png")
+plt.savefig("fcnet_regression_data.png")
 
 # Generate tensorflow graph
 n_hidden = 15
@@ -48,7 +48,7 @@ with tf.name_scope("summaries"):
   tf.summary.scalar("loss", l)
   merged = tf.summary.merge_all()
 
-train_writer = tf.summary.FileWriter('/tmp/fcnet-train', tf.get_default_graph())
+train_writer = tf.summary.FileWriter('/tmp/fcnet-regression-train', tf.get_default_graph())
 
 n_steps = 200
 with tf.Session() as sess:
@@ -73,7 +73,7 @@ plt.xlabel("Y-true")
 plt.ylabel("Y-pred")
 plt.title("Predicted versus true values")
 plt.scatter(y_np, y_pred_np)
-plt.savefig("fcnet_pred.png")
+plt.savefig("fcnet_regression_pred.png")
 
 # Now draw with learned regression line
 plt.clf()
@@ -82,4 +82,4 @@ plt.ylabel("Y")
 plt.title("Predicted versus true values")
 plt.xlim(0, 1)
 plt.scatter(x_np, y_pred_np)
-plt.savefig("fcnet_learned.png")
+plt.savefig("fcnet_regression_learned.png")

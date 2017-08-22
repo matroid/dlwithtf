@@ -62,8 +62,8 @@ def ptb_raw_data(data_path=None):
   http://www.fit.vutbr.cz/~imikolov/rnnlm/simple-examples.tgz
 
   Args:
-    data_path: string path to the directory where simple-examples.tgz has
-      been extracted.
+    data_path: string path to the directory where simple-examples.tgz
+               has been extracted.
 
   Returns:
     tuple (train_data, valid_data, test_data, vocabulary)
@@ -85,8 +85,8 @@ def ptb_raw_data(data_path=None):
 def ptb_producer(raw_data, batch_size, num_steps, name=None):
   """Iterate on the raw PTB data.
 
-  This chunks up raw_data into batches of examples and returns Tensors that
-  are drawn from these batches.
+  This chunks up raw_data into batches of examples and returns
+  Tensors that are drawn from these batches.
 
   Args:
     raw_data: one of the raw data outputs from ptb_raw_data.
@@ -95,14 +95,18 @@ def ptb_producer(raw_data, batch_size, num_steps, name=None):
     name: the name of this operation (optional).
 
   Returns:
-    A pair of Tensors, each shaped [batch_size, num_steps]. The second element
-    of the tuple is the same data time-shifted to the right by one.
+    A pair of Tensors, each shaped [batch_size, num_steps]. The
+    second element of the tuple is the same data time-shifted to the
+    right by one.
 
   Raises:
-    tf.errors.InvalidArgumentError: if batch_size or num_steps are too high.
+    tf.errors.InvalidArgumentError: if batch_size or num_steps are
+    too high.
   """
-  with tf.name_scope(name, "PTBProducer", [raw_data, batch_size, num_steps]):
-    raw_data = tf.convert_to_tensor(raw_data, name="raw_data", dtype=tf.int32)
+  with tf.name_scope(name, "PTBProducer",
+                     [raw_data, batch_size, num_steps]):
+    raw_data = tf.convert_to_tensor(raw_data, name="raw_data",
+                                    dtype=tf.int32)
 
     data_len = tf.size(raw_data)
     batch_len = data_len // batch_size
@@ -116,7 +120,8 @@ def ptb_producer(raw_data, batch_size, num_steps, name=None):
     with tf.control_dependencies([assertion]):
       epoch_size = tf.identity(epoch_size, name="epoch_size")
 
-    i = tf.train.range_input_producer(epoch_size, shuffle=False).dequeue()
+    i = tf.train.range_input_producer(epoch_size,
+                                      shuffle=False).dequeue()
     x = tf.strided_slice(data, [0, i * num_steps],
                          [batch_size, (i + 1) * num_steps])
     x.set_shape([batch_size, num_steps])

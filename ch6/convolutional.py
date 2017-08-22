@@ -268,7 +268,6 @@ start_time = time.time()
 with tf.Session() as sess:
   # Run all the initializers to prepare the trainable parameters.
   tf.global_variables_initializer().run()
-  print('Initialized!')
   # Loop through training steps.
   for step in xrange(int(num_epochs * train_size) // BATCH_SIZE):
     # Compute the offset of the current minibatch in the data.

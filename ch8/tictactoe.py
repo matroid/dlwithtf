@@ -46,11 +46,18 @@ class TicTacToePolicy(dc.rl.Policy):
 def eval_tic_tac_toe(value_weight,
                      num_epoch_rounds=1,
                      games=10**4,
-                     rollouts=10**5):
+                     rollouts=10**5,
+                     advantage_lambda=0.98):
   """
   Returns the average reward over 10k games after 100k rollouts
-  :param value_weight:
-  :return:
+  
+  Parameters
+  ----------
+  value_weight: float
+
+  Returns
+  ------- 
+  avg_rewards
   """
   env = TicTacToeEnvironment()
   policy = TicTacToePolicy()
@@ -69,6 +76,7 @@ def eval_tic_tac_toe(value_weight,
         entropy_weight=0.01,
         value_weight=value_weight,
         model_dir=model_dir,
+        advantage_lambda=advantage_lambda,
         optimizer=Adam(learning_rate=0.001))
     try:
       a3c_engine.restore()
@@ -91,10 +99,11 @@ def eval_tic_tac_toe(value_weight,
 
 def main():
   value_weight = 6.0
-  score = eval_tic_tac_toe(value_weight, num_epoch_rounds=20,
+  score = eval_tic_tac_toe(value_weight=0.2, num_epoch_rounds=20,
+                           advantage_lambda=0.,
                            games=10**4, rollouts=5*10**4)
   print(score)
 
 
 if __name__ == "__main__":
-    main()
+  main()

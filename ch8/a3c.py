@@ -31,32 +31,20 @@ from deepchem.utils.evaluate import GeneratorEvaluator
 from deepchem.feat.graph_features import ConvMolFeaturizer
 from deepchem.data.data_loader import featurize_smiles_np
 
+
 class TensorGraph(Model):
 
   def __init__(self,
-               tensorboard=False,
-               tensorboard_log_frequency=100,
                batch_size=100,
                random_seed=None,
-               use_queue=True,
                graph=None,
                learning_rate=0.001,
                **kwargs):
     """
     Parameters
     ----------
-    tensorboard: bool
-      Should we log to model_dir data for tensorboard?
-    tensorboard_log_frequency: int
-      How many training batches before logging tensorboard?
     batch_size: int
       default batch size for training and evaluating
-    use_queue: boolean
-      if True when building we will create a tf.FIFO queue, which will hold
-      all features, weights, and labels.  We will feed the inputs into this
-      queue in batches of self.batch_size in a separate thread from the
-      thread training the model.  You cannot use a queue when
-      batches are not of consistent size
     graph: tensorflow.Graph
       the Graph in which to create Tensorflow objects.  If None, a new Graph
       is created.
@@ -73,7 +61,6 @@ class TensorGraph(Model):
     self.task_weights = list()
     self.loss = None
     self.built = False
-    self.queue_installed = False
     self.optimizer = None
     self.learning_rate = learning_rate
 
@@ -86,25 +73,13 @@ class TensorGraph(Model):
         "train_op": None,
         "summary_op": None,
     }
-    self.tensorboard = tensorboard
-    self.tensorboard_log_frequency = tensorboard_log_frequency
-    self.tensorboard_step = 0
     self.global_step = 0
-    #self.use_queue = use_queue
 
     self.batch_size = batch_size
     self.random_seed = random_seed
     super(TensorGraph, self).__init__(**kwargs)
     self.save_file = "%s/%s" % (self.model_dir, "model")
     self.model_class = None
-
-    self.rnn_initial_states = []
-    self.rnn_final_states = []
-    self.rnn_zero_states = []
-    #if self.use_queue and self.tensorboard:
-    #  raise ValueError(
-    #      "Currently TensorGraph cannot both use_queue and tensorboard at the same time"
-    #  )
 
   def _add_layer(self, layer):
     if layer.name is None:
@@ -174,9 +149,6 @@ class TensorGraph(Model):
     """
 
     def create_feed_dict():
-      #if self.use_queue:
-      #  while True:
-      #    yield {self._training_placeholder: 1.0}
       for d in feed_dict_generator:
         feed_dict = {k.out_tensor: v for k, v in six.iteritems(d)}
         feed_dict[self._training_placeholder] = 1.0
@@ -194,12 +166,6 @@ class TensorGraph(Model):
       avg_loss, n_batches = 0.0, 0.0
       coord = tf.train.Coordinator()
       n_samples = 0
-      #if self.use_queue:
-      #  enqueue_thread = threading.Thread(
-      #      target=_enqueue_batch,
-      #      args=(self, feed_dict_generator, self._get_tf("Graph"),
-      #            self.session, coord))
-      #  enqueue_thread.start()
       output_tensors = [x.out_tensor for x in self.outputs]
       fetches = output_tensors + [train_op, self.loss.out_tensor]
       for feed_dict in create_feed_dict():
@@ -210,10 +176,6 @@ class TensorGraph(Model):
           n_batches += 1
           self.global_step += 1
           n_samples += 1
-          if self.tensorboard and n_samples % self.tensorboard_log_frequency == 0:
-            summary = self.session.run(
-                self._get_tf("summary_op"), feed_dict=feed_dict)
-            self._log_tensorboard(summary)
         except OutOfRangeError:
           break
         if self.global_step % checkpoint_interval == checkpoint_interval - 1:
@@ -230,19 +192,6 @@ class TensorGraph(Model):
       time2 = time.time()
       print("TIMING: model fitting took %0.3f s" % (time2 - time1))
 
-  def _log_tensorboard(self, summary):
-    """
-    TODO(LESWING) set epoch
-    Parameters
-    ----------
-    Returns
-    -------
-    """
-    global_step = int(self.global_step)
-    writer = self._get_tf("FileWriter")
-    writer.reopen()
-    writer.add_summary(summary, global_step=global_step)
-    writer.close()
 
   def fit_on_batch(self, X, y, w):
     if not self.built:
@@ -274,9 +223,6 @@ class TensorGraph(Model):
           feed_dict[self.features[0]] = X_b
         if len(self.task_weights) == 1 and w_b is not None and not predict:
           feed_dict[self.task_weights[0]] = w_b
-        for (initial_state, zero_state) in zip(self.rnn_initial_states,
-                                               self.rnn_zero_states):
-          feed_dict[initial_state] = zero_state
         yield feed_dict
 
   def predict_on_generator(self, generator, transformers=[], outputs=None):
@@ -439,66 +385,23 @@ class TensorGraph(Model):
       self._training_placeholder = tf.placeholder(dtype=tf.float32, shape=())
       if self.random_seed is not None:
         tf.set_random_seed(self.random_seed)
-      #self._install_queue()
-      for layer in self.features + self.labels + self.task_weights:
-        layer.pre_queue = True
       for layer in self.topsort():
         with tf.name_scope(layer.name):
           layer.create_tensor(training=self._training_placeholder)
-          self.rnn_initial_states += layer.rnn_initial_states
-          self.rnn_final_states += layer.rnn_final_states
-          self.rnn_zero_states += layer.rnn_zero_states
-          layer.add_summary_to_tg()
       self.session = tf.Session()
 
       self.built = True
 
-    for layer in self.layers.values():
-      if layer.tensorboard:
-        self.tensorboard = True
-    tf.summary.scalar("loss", self.loss.out_tensor)
-    for layer in self.layers.values():
-      if layer.tensorboard:
-        tf.summary.tensor_summary(layer.name, layer.out_tensor)
-    if self.tensorboard:
-      writer = self._get_tf("FileWriter")
-      writer.add_graph(self._get_tf("Graph"))
-      writer.close()
+    ## As a sanity check, make sure all tensors have the correct shape.
 
-    # As a sanity check, make sure all tensors have the correct shape.
+    #for layer in self.layers.values():
+    #  try:
+    #    assert list(layer.shape) == layer.out_tensor.get_shape().as_list(
+    #    ), '%s: Expected shape %s does not match actual shape %s' % (
+    #        layer.name, layer.shape, layer.out_tensor.get_shape().as_list())
+    #  except NotImplementedError:
+    #    pass
 
-    for layer in self.layers.values():
-      try:
-        assert list(layer.shape) == layer.out_tensor.get_shape().as_list(
-        ), '%s: Expected shape %s does not match actual shape %s' % (
-            layer.name, layer.shape, layer.out_tensor.get_shape().as_list())
-      except NotImplementedError:
-        pass
-
-  #def _install_queue(self):
-  #  """
-  #  """
-  #  if not self.use_queue or self.queue_installed:
-  #    for layer in self.features + self.labels + self.task_weights:
-  #      layer.pre_queue = True
-  #    return
-  #  names = []
-  #  shapes = []
-  #  pre_q_inputs = []
-  #  q = InputFifoQueue(shapes, names, in_layers=pre_q_inputs)
-  #  q.name = "%s_%s" % (q.__class__.__name__, len(self.layers) + 1)
-
-  #  for layer in self.features + self.labels + self.task_weights:
-  #    pre_q_input = layer.create_pre_q(self.batch_size)
-  #    shapes.append(pre_q_input.shape)
-  #    names.append(pre_q_input.name)
-  #    pre_q_inputs.append(pre_q_input)
-
-  #    layer.in_layers.append(q)
-
-  #  self._add_layer(q)
-  #  self.input_queue = q
-  #  self.queue_installed = True
 
   def set_loss(self, layer):
     self._add_layer(layer)
@@ -511,77 +414,6 @@ class TensorGraph(Model):
   def set_optimizer(self, optimizer):
     """Set the optimizer to use for fitting."""
     self.optimizer = optimizer
-
-  def get_pickling_errors(self, obj, seen=None):
-    if seen == None:
-      seen = []
-    try:
-      state = obj.__getstate__()
-    except AttributeError:
-      return
-    if state == None:
-      return
-    if isinstance(state, tuple):
-      if not isinstance(state[0], dict):
-        state = state[1]
-      else:
-        state = state[0].update(state[1])
-    result = {}
-    for i in state:
-      try:
-        pickle.dumps(state[i], protocol=2)
-      except pickle.PicklingError:
-        if not state[i] in seen:
-          seen.append(state[i])
-          result[i] = self.get_pickling_errors(state[i], seen)
-    return result
-
-  def save(self):
-    # Remove out_tensor from the object to be pickled
-    must_restore = False
-    tensor_objects = self.tensor_objects
-    rnn_initial_states = self.rnn_initial_states
-    rnn_final_states = self.rnn_final_states
-    rnn_zero_states = self.rnn_zero_states
-    session = self.session
-    self.tensor_objects = {}
-    self.rnn_initial_states = []
-    self.rnn_final_states = []
-    self.rnn_zero_states = []
-    self.session = None
-    out_tensors = []
-    if self.built:
-      must_restore = True
-      for layer in self.topsort():
-        out_tensors.append(layer.none_tensors())
-      optimizer = self.optimizer
-      self.optimizer = None
-      training_placeholder = self._training_placeholder
-      self._training_placeholder = None
-      self.built = False
-
-    # Pickle itself
-    pickle_name = os.path.join(self.model_dir, "model.pickle")
-
-    with open(pickle_name, 'wb') as fout:
-      try:
-        pickle.dump(self, fout)
-      except Exception as e:
-        print(self.get_pickling_errors(self))
-        raise e
-
-    # add out_tensor back to everyone
-    if must_restore:
-      for index, layer in enumerate(self.topsort()):
-        layer.set_tensors(out_tensors[index])
-      self._training_placeholder = training_placeholder
-      self.optimizer = optimizer
-      self.built = True
-    self.tensor_objects = tensor_objects
-    self.rnn_initial_states = rnn_initial_states
-    self.rnn_final_states = rnn_final_states
-    self.rnn_zero_states = rnn_zero_states
-    self.session = session
 
   def evaluate_generator(self,
                          feed_dict_generator,
@@ -682,10 +514,10 @@ class TensorGraph(Model):
   def get_num_tasks(self):
     return len(self.outputs)
 
-  def get_pre_q_input(self, input_layer):
-    layer_name = input_layer.name
-    pre_q_name = "%s_pre_q" % layer_name
-    return self.layers[pre_q_name]
+  #def get_pre_q_input(self, input_layer):
+  #  layer_name = input_layer.name
+  #  pre_q_name = "%s_pre_q" % layer_name
+  #  return self.layers[pre_q_name]
 
   @staticmethod
   def load_from_dir(model_dir):
@@ -717,43 +549,43 @@ class Layer(object):
     self.in_layers = in_layers
     self.op_type = "gpu"
     self.variable_scope = ''
-    self.rnn_initial_states = []
-    self.rnn_final_states = []
-    self.rnn_zero_states = []
-    self.tensorboard = False
+    #self.rnn_initial_states = []
+    #self.rnn_final_states = []
+    #self.rnn_zero_states = []
+    #self.tensorboard = False
     self.tb_input = None
 
-  def _get_layer_number(self):
-    class_name = self.__class__.__name__
-    if class_name not in Layer.layer_number_dict:
-      Layer.layer_number_dict[class_name] = 0
-    Layer.layer_number_dict[class_name] += 1
-    return "%s" % Layer.layer_number_dict[class_name]
+  #def _get_layer_number(self):
+  #  class_name = self.__class__.__name__
+  #  if class_name not in Layer.layer_number_dict:
+  #    Layer.layer_number_dict[class_name] = 0
+  #  Layer.layer_number_dict[class_name] += 1
+  #  return "%s" % Layer.layer_number_dict[class_name]
 
-  def none_tensors(self):
-    out_tensor = self.out_tensor
-    self.out_tensor = None
-    return out_tensor
+  #def none_tensors(self):
+  #  out_tensor = self.out_tensor
+  #  self.out_tensor = None
+  #  return out_tensor
 
-  def set_tensors(self, tensor):
-    self.out_tensor = tensor
+  #def set_tensors(self, tensor):
+  #  self.out_tensor = tensor
 
   def create_tensor(self, in_layers=None, set_tensors=True, **kwargs):
     raise NotImplementedError("Subclasses must implement for themselves")
 
-  def shared(self, in_layers):
-    """
-    Share weights with different in tensors and a new out tensor
-    Parameters
-    ----------
-    in_layers: list tensor
-    List in tensors for the shared layer
+  #def shared(self, in_layers):
+  #  """
+  #  Share weights with different in tensors and a new out tensor
+  #  Parameters
+  #  ----------
+  #  in_layers: list tensor
+  #  List in tensors for the shared layer
 
-    Returns
-    -------
-    Layer
-    """
-    raise NotImplementedError("Each Layer must implement shared for itself")
+  #  Returns
+  #  -------
+  #  Layer
+  #  """
+  #  raise NotImplementedError("Each Layer must implement shared for itself")
 
   def __call__(self, *in_layers):
     return self.create_tensor(in_layers=in_layers, set_tensors=False)
@@ -809,53 +641,6 @@ class Layer(object):
     else:
       self.variable_scope = local_scope
 
-  def set_summary(self, summary_op, summary_description=None, collections=None):
-    """Annotates a tensor with a tf.summary operation
-    Collects data from self.out_tensor by default but can be changed by setting 
-    self.tb_input to another tensor in create_tensor
-
-
-    Parameters
-    ----------
-    summary_op: str
-      summary operation to annotate node
-    summary_description: object, optional
-      Optional summary_pb2.SummaryDescription()
-    collections: list of graph collections keys, optional
-      New summary op is added to these collections. Defaults to [GraphKeys.SUMMARIES]
-    """
-    supported_ops = {'tensor_summary', 'scalar', 'histogram'}
-    if summary_op not in supported_ops:
-      raise ValueError(
-          "Invalid summary_op arg. Only 'tensor_summary', 'scalar', 'histogram' supported"
-      )
-    self.summary_op = summary_op
-    self.summary_description = summary_description
-    self.collections = collections
-    self.tensorboard = True
-
-  def add_summary_to_tg(self):
-    """
-    Can only be called after self.create_layer to gaurentee that name is not none
-    """
-    if self.tensorboard == False:
-      return
-    if self.tb_input == None:
-      self.tb_input = self.out_tensor
-    if self.summary_op == "tensor_summary":
-      tf.summary.tensor_summary(self.name, self.tb_input,
-                                self.summary_description, self.collections)
-    elif self.summary_op == 'scalar':
-      tf.summary.scalar(self.name, self.tb_input, self.collections)
-    elif self.summary_op == 'histogram':
-      tf.summary.histogram(self.name, self.tb_input, self.collections)
-
-  def _as_graph_element(self):
-    if '_as_graph_element' in dir(self.out_tensor):
-      return self.out_tensor._as_graph_element()
-    else:
-      return self.out_tensor
-
 def _convert_layer_to_tensor(value, dtype=None, name=None, as_ref=False):
   return tf.convert_to_tensor(value.out_tensor, dtype=dtype, name=name)
 
@@ -874,6 +659,106 @@ def convert_to_layers(in_layers):
       raise ValueError("convert_to_layers must be invoked on layers or tensors")
   return layers
 
+class Dense(Layer):
+
+  def __init__(
+      self,
+      out_channels,
+      activation_fn=None,
+      biases_initializer=tf.zeros_initializer,
+      weights_initializer=tf.contrib.layers.variance_scaling_initializer,
+      time_series=False,
+      **kwargs):
+    """Create a dense layer.
+
+    The weight and bias initializers are specified by callable objects that construct
+    and return a Tensorflow initializer when invoked with no arguments.  This will typically
+    be either the initializer class itself (if the constructor does not require arguments),
+    or a TFWrapper (if it does).
+
+    Parameters
+    ----------
+    out_channels: int
+      the number of output values
+    activation_fn: object
+      the Tensorflow activation function to apply to the output
+    biases_initializer: callable object
+      the initializer for bias values.  This may be None, in which case the layer
+      will not include biases.
+    weights_initializer: callable object
+      the initializer for weight values
+    time_series: bool
+      if True, the dense layer is applied to each element of a batch in sequence
+    """
+    super(Dense, self).__init__(**kwargs)
+    self.out_channels = out_channels
+    self.out_tensor = None
+    self.activation_fn = activation_fn
+    self.biases_initializer = biases_initializer
+    self.weights_initializer = weights_initializer
+    self.time_series = time_series
+    try:
+      parent_shape = self.in_layers[0].shape
+      self._shape = (parent_shape[0], out_channels)
+    except:
+      pass
+    self._reuse = False
+    self._shared_with = None
+
+  def create_tensor(self, in_layers=None, set_tensors=True, **kwargs):
+    inputs = self._get_input_tensors(in_layers)
+    if len(inputs) != 1:
+      raise ValueError("Dense layer can only have one input")
+    parent = inputs[0]
+    if self.biases_initializer is None:
+      biases_initializer = None
+    else:
+      biases_initializer = self.biases_initializer()
+    for reuse in (self._reuse, False):
+      dense_fn = lambda x: tf.contrib.layers.fully_connected(x,
+                                                             num_outputs=self.out_channels,
+                                                             activation_fn=self.activation_fn,
+                                                             biases_initializer=biases_initializer,
+                                                             weights_initializer=self.weights_initializer(),
+                                                             scope=self._get_scope_name(),
+                                                             reuse=reuse,
+                                                             trainable=True)
+      try:
+        if self.time_series:
+          out_tensor = tf.map_fn(dense_fn, parent)
+        else:
+          out_tensor = dense_fn(parent)
+        break
+      except ValueError:
+        if reuse:
+          # This probably means the variable hasn't been created yet, so try again
+          # with reuse set to false.
+          continue
+        raise
+    if set_tensors:
+      self._record_variable_scope(self._get_scope_name())
+      self.out_tensor = out_tensor
+    return out_tensor
+
+  def shared(self, in_layers):
+    copy = Dense(
+        self.out_channels,
+        self.activation_fn,
+        self.biases_initializer,
+        self.weights_initializer,
+        time_series=self.time_series,
+        in_layers=in_layers)
+    self._reuse = True
+    copy._reuse = True
+    copy._shared_with = self
+    return copy
+
+  def _get_scope_name(self):
+    if self._shared_with is None:
+      return self.name
+    else:
+      return self._shared_with._get_scope_name()
+
 class Input(Layer):
 
   def __init__(self, shape, dtype=tf.float32, **kwargs):
@@ -886,23 +771,10 @@ class Input(Layer):
     if in_layers is None:
       in_layers = self.in_layers
     in_layers = convert_to_layers(in_layers)
-    #if len(in_layers) > 0:
-    #  queue = in_layers[0]
-    #  placeholder = queue.out_tensors[self.get_pre_q_name()]
-    #  self.out_tensor = tf.placeholder_with_default(placeholder, self._shape)
-    #  return self.out_tensor
     out_tensor = tf.placeholder(dtype=self.dtype, shape=self._shape)
     if set_tensors:
       self.out_tensor = out_tensor
     return out_tensor
-
-  def create_pre_q(self, batch_size):
-    q_shape = (batch_size,) + self._shape[1:]
-    return Input(shape=q_shape, name="%s_pre_q" % self.name, dtype=self.dtype)
-
-  def get_pre_q_name(self):
-    return "%s_pre_q" % self.name
-
 
 class Feature(Input):
 
@@ -1119,7 +991,6 @@ class A3C(object):
         in_layers=[rewards, actions, action_prob, value, advantages])
     graph = TensorGraph(
         batch_size=self.max_rollout_length,
-        use_queue=False,
         graph=tf_graph,
         model_dir=model_dir)
     for f in features:

@@ -18,14 +18,16 @@ import os
 import six
 import tensorflow as tf
 import tempfile
+from deepchem.models import Model
 
-class TensorGraph(object):
+class TensorGraph(Model):
 
   def __init__(self,
                batch_size=100,
                random_seed=None,
                graph=None,
                learning_rate=0.001,
+               model_dir=None,
                **kwargs):
     """
     Parameters
@@ -62,7 +64,13 @@ class TensorGraph(object):
 
     self.batch_size = batch_size
     self.random_seed = random_seed
-    self.model_dir = tempfile.mkdtemp()
+    if model_dir is not None:
+      if not os.path.exists(model_dir):
+        os.makedirs(model_dir)
+    else:
+      model_dir = tempfile.mkdtemp()
+      self.model_dir_is_temp = True
+    self.model_dir = model_dir
     self.save_file = "%s/%s" % (self.model_dir, "model")
     self.model_class = None
 
@@ -152,17 +160,11 @@ class TensorGraph(object):
     if obj == "Graph":
       self.tensor_objects["Graph"] = tf.Graph()
     elif obj == "Optimizer":
-      if self.optimizer is None:
-        self.optimizer = Adam(
-            learning_rate=self.learning_rate,
-            beta1=0.9,
-            beta2=0.999,
-            epsilon=1e-7)
-      self.tensor_objects["Optimizer"] = self.optimizer._create_optimizer(
-          self._get_tf("GlobalStep"))
-    #elif obj == "train_op":
-    #  self.tensor_objects["train_op"] = self._get_tf("Optimizer").minimize(
-    #      self.loss.out_tensor, global_step=self._get_tf("GlobalStep"))
+      self.tensor_objects["Optimizer"] = tf.train.AdamOptimizer(
+          learning_rate=self.learning_rate,
+          beta1=0.9,
+          beta2=0.999,
+          epsilon=1e-7)
     elif obj == "GlobalStep":
       with self._get_tf("Graph").as_default():
         self.tensor_objects["GlobalStep"] = tf.Variable(0, trainable=False)
@@ -440,83 +442,6 @@ class Input(Layer):
       self.out_tensor = out_tensor
     return out_tensor
 
-#class Optimizer(object):
-#  """An algorithm for optimizing a TensorGraph based model.
-#
-#  This is an abstract class.  Subclasses represent specific optimization algorithms.
-#  """
-#
-#  def _create_optimizer(self, global_step):
-#    """Construct the TensorFlow optimizer.
-#
-#    Parameters
-#    ----------
-#    global_step: tensor
-#      a tensor containing the global step index during optimization, used for learning rate decay
-#
-#    Returns
-#    -------
-#    a new TensorFlow optimizer implementing the algorithm
-#    """
-#    raise NotImplemented("Subclasses must implement this")
-
-
-#class LearningRateSchedule(object):
-#  """A schedule for changing the learning rate over the course of optimization.
-#
-#  This is an abstract class.  Subclasses represent specific schedules.
-#  """
-#
-#  def _create_tensor(self, global_step):
-#    """Construct a tensor that equals the learning rate.
-#
-#    Parameters
-#    ----------
-#    global_step: tensor
-#      a tensor containing the global step index during optimization
-#
-#    Returns
-#    -------
-#    a tensor that equals the learning rate
-#    """
-#    raise NotImplemented("Subclasses must implement this")
-
-
-#class Adam(Optimizer):
-class Adam(object):
-  """The Adam optimization algorithm."""
-
-  def __init__(self, learning_rate=0.001, beta1=0.9, beta2=0.999,
-               epsilon=1e-08):
-    """Construct an Adam optimizer.
-
-    Parameters
-    ----------
-    learning_rate: float or LearningRateSchedule
-      the learning rate to use for optimization
-    beta1: float
-      a parameter of the Adam algorithm
-    beta2: float
-      a parameter of the Adam algorithm
-    epsilon: float
-      a parameter of the Adam algorithm
-    """
-    self.learning_rate = learning_rate
-    self.beta1 = beta1
-    self.beta2 = beta2
-    self.epsilon = epsilon
-
-  def _create_optimizer(self, global_step):
-    #if isinstance(self.learning_rate, LearningRateSchedule):
-    #  learning_rate = self.learning_rate._create_tensor(global_step)
-    #else:
-    learning_rate = self.learning_rate
-    return tf.train.AdamOptimizer(
-        learning_rate=learning_rate,
-        beta1=self.beta1,
-        beta2=self.beta2,
-        epsilon=self.epsilon)
-
 
 class A3CLoss(Layer):
   """This layer computes the loss function for A3C."""
@@ -570,7 +495,6 @@ class A3C(object):
 
   def __init__(self,
                env,
-               #policy,
                max_rollout_length=20,
                discount_factor=0.99,
                advantage_lambda=0.98,
@@ -584,10 +508,6 @@ class A3C(object):
     ----------
     env: Environment
       the Environment to interact with
-    #policy: Policy
-    #  the Policy to optimize.  Its create_layers() method must return a map
-    #  containing the keys "action_prob" and "value", corresponding to the
-    #  action probabilities and value estimate
     max_rollout_length: int
       the maximum length of rollouts to generate
     discount_factor: float
@@ -610,10 +530,7 @@ class A3C(object):
     self.advantage_lambda = advantage_lambda
     self.value_weight = value_weight
     self.entropy_weight = entropy_weight
-    if optimizer is None:
-      self._optimizer = Adam(learning_rate=0.001, beta1=0.9, beta2=0.999)
-    else:
-      self._optimizer = optimizer
+    self._optimizer = None
     (self._graph, self._features, self._rewards, self._actions,
      self._action_prob, self._value, self._advantages) = self.build_graph(
          None, "global", model_dir)
@@ -623,10 +540,6 @@ class A3C(object):
   def build_graph(self, tf_graph, scope, model_dir):
     """Construct a TensorGraph containing the policy and loss calculations."""
     state_shape = self._env.state_shape
-    ########################################################### DEBUG
-    print("state_shape")
-    print(state_shape)
-    ########################################################### DEBUG
     features = []
     for s in state_shape:
       features.append(Input(shape=[None] + list(s), dtype=tf.float32))

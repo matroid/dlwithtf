@@ -7,13 +7,13 @@ import numpy as np
 import tensorflow as tf
 import deepchem as dc
 from environment import TicTacToeEnvironment
-from a3c import Layer
-from a3c import Adam
-from a3c import Dense
-from a3c import Squeeze
-from a3c import BatchNorm
-from a3c import Flatten
-from a3c import SoftMax
+#from a3c import Layer
+#from a3c import Adam
+#from a3c import Dense
+#from a3c import Squeeze
+#from a3c import BatchNorm
+#from a3c import Flatten
+#from a3c import SoftMax
 from a3c import A3C
 
 
@@ -63,7 +63,6 @@ def eval_tic_tac_toe(value_weight,
   avg_rewards
   """
   env = TicTacToeEnvironment()
-  #policy = TicTacToePolicy()
   model_dir = "/tmp/tictactoe"
   try:
     shutil.rmtree(model_dir)
@@ -75,12 +74,10 @@ def eval_tic_tac_toe(value_weight,
     print("Epoch round: %d" % j)
     a3c_engine = A3C(
         env,
-        #policy,
         entropy_weight=0.01,
         value_weight=value_weight,
         model_dir=model_dir,
-        advantage_lambda=advantage_lambda,
-        optimizer=Adam(learning_rate=0.001))
+        advantage_lambda=advantage_lambda)
     try:
       a3c_engine.restore()
     except:

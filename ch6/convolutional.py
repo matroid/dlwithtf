@@ -50,7 +50,8 @@ def download(filename):
     os.makedirs(WORK_DIRECTORY)
   filepath = os.path.join(WORK_DIRECTORY, filename)
   if not os.path.exists(filepath):
-    filepath, _ = urllib.request.urlretrieve(SOURCE_URL + filename, filepath)
+    filepath, _ = urllib.request.urlretrieve(SOURCE_URL + filename,
+                                             filepath)
     size = os.stat(filepath).st_size
     print('Successfully downloaded', filename, size, 'bytes.')
   return filepath
@@ -64,10 +65,15 @@ def extract_data(filename, num_images):
   print('Extracting', filename)
   with gzip.open(filename) as bytestream:
     bytestream.read(16)
-    buf = bytestream.read(IMAGE_SIZE * IMAGE_SIZE * num_images * NUM_CHANNELS)
-    data = numpy.frombuffer(buf, dtype=numpy.uint8).astype(numpy.float32)
-    data = (data - (PIXEL_DEPTH / 2.0)) / PIXEL_DEPTH
-    data = data.reshape(num_images, IMAGE_SIZE, IMAGE_SIZE, NUM_CHANNELS)
+    buf = bytestream.read(
+        IMAGE_SIZE * IMAGE_SIZE * num_images * NUM_CHANNELS)
+    data = numpy.frombuffer(buf, dtype=numpy.uint8).astype(
+        numpy.float32)
+    # The original data consists of pixels ranging from 0-255.
+    # Center the data to have mean zero, and unit range.
+    data = (data - (255/2.0))/255 
+    data = data.reshape(num_images, IMAGE_SIZE, IMAGE_SIZE,
+                        NUM_CHANNELS)
     return data
 
 
@@ -75,9 +81,12 @@ def extract_labels(filename, num_images):
   """Extract the labels into a vector of int64 label IDs."""
   print('Extracting', filename)
   with gzip.open(filename) as bytestream:
+    # Discard header.
     bytestream.read(8)
-    buf = bytestream.read(1 * num_images)
-    labels = numpy.frombuffer(buf, dtype=numpy.uint8).astype(numpy.int64)
+    # Read bytes for labels.
+    buf = bytestream.read(num_images)
+    labels = numpy.frombuffer(buf, dtype=numpy.uint8).astype(
+        numpy.int64)
   return labels
 
 
@@ -88,21 +97,23 @@ def error_rate(predictions, labels):
       numpy.sum(numpy.argmax(predictions, 1) == labels) /
       predictions.shape[0])
 
-# We will replicate the model structure for the training subgraph, as well
-# as the evaluation subgraphs, while sharing the trainable parameters.
+# We will replicate the model structure for the training subgraph, as
+# well as the evaluation subgraphs, while sharing the trainable
+# parameters.
 def model(data, train=False):
   """The Model definition."""
-  # 2D convolution, with 'SAME' padding (i.e. the output feature map has
-  # the same size as the input). Note that {strides} is a 4D array whose
-  # shape matches the data layout: [image index, y, x, depth].
+  # 2D convolution, with 'SAME' padding (i.e. the output feature map
+  # has the same size as the input). Note that {strides} is a 4D array
+  # whose shape matches the data layout: [image index, y, x, depth].
   conv = tf.nn.conv2d(data,
                       conv1_weights,
                       strides=[1, 1, 1, 1],
                       padding='SAME')
   # Bias and rectified linear non-linearity.
   relu = tf.nn.relu(tf.nn.bias_add(conv, conv1_biases))
-  # Max pooling. The kernel size spec {ksize} also follows the layout of
-  # the data. Here we have a pooling window of 2, and a stride of 2.
+  # Max pooling. The kernel size spec {ksize} also follows the layout
+  # of the data. Here we have a pooling window of 2, and a stride of
+  # 2.
   pool = tf.nn.max_pool(relu,
                         ksize=[1, 2, 2, 1],
                         strides=[1, 2, 2, 1],
@@ -150,6 +161,7 @@ validation_data = train_data[:VALIDATION_SIZE, ...]
 validation_labels = train_labels[:VALIDATION_SIZE]
 train_data = train_data[VALIDATION_SIZE:, ...]
 train_labels = train_labels[VALIDATION_SIZE:]
+
 num_epochs = NUM_EPOCHS
 train_size = train_labels.shape[0]
 
@@ -164,24 +176,27 @@ eval_data = tf.placeholder(
     tf.float32,
     shape=(EVAL_BATCH_SIZE, IMAGE_SIZE, IMAGE_SIZE, NUM_CHANNELS))
 
-# The variables below hold all the trainable weights. They are passed an
-# initial value which will be assigned when we call:
+# The variables below hold all the trainable weights. They are passed
+# an initial value which will be assigned when we call:
 # {tf.global_variables_initializer().run()}
 conv1_weights = tf.Variable(
-    tf.truncated_normal([5, 5, NUM_CHANNELS, 32],  # 5x5 filter, depth 32.
+    # 5x5 filter, depth 32.
+    tf.truncated_normal([5, 5, NUM_CHANNELS, 32],  
                         stddev=0.1,
                         seed=SEED, dtype=tf.float32))
 conv1_biases = tf.Variable(tf.zeros([32], dtype=tf.float32))
 conv2_weights = tf.Variable(tf.truncated_normal(
     [5, 5, 32, 64], stddev=0.1,
     seed=SEED, dtype=tf.float32))
-conv2_biases = tf.Variable(tf.constant(0.1, shape=[64], dtype=tf.float32))
+conv2_biases = tf.Variable(tf.constant(0.1, shape=[64],
+                           dtype=tf.float32))
 fc1_weights = tf.Variable(  # fully connected, depth 512.
     tf.truncated_normal([IMAGE_SIZE // 4 * IMAGE_SIZE // 4 * 64, 512],
                         stddev=0.1,
                         seed=SEED,
                         dtype=tf.float32))
-fc1_biases = tf.Variable(tf.constant(0.1, shape=[512], dtype=tf.float32))
+fc1_biases = tf.Variable(tf.constant(0.1, shape=[512],
+                         dtype=tf.float32))
 fc2_weights = tf.Variable(tf.truncated_normal([512, NUM_LABELS],
                                               stddev=0.1,
                                               seed=SEED,
@@ -195,8 +210,10 @@ loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(
     labels=train_labels_node, logits=logits))
 
 # L2 regularization for the fully connected parameters.
-regularizers = (tf.nn.l2_loss(fc1_weights) + tf.nn.l2_loss(fc1_biases) +
-                tf.nn.l2_loss(fc2_weights) + tf.nn.l2_loss(fc2_biases))
+regularizers = (tf.nn.l2_loss(fc1_weights)
+                + tf.nn.l2_loss(fc1_biases)
+                + tf.nn.l2_loss(fc2_weights)
+                + tf.nn.l2_loss(fc2_biases))
 # Add the regularization term to the loss.
 loss += 5e-4 * regularizers
 
@@ -218,18 +235,21 @@ optimizer = tf.train.MomentumOptimizer(learning_rate,
 # Predictions for the current training minibatch.
 train_prediction = tf.nn.softmax(logits)
 
-# Predictions for the test and validation, which we'll compute less often.
+# Predictions for the test and validation, which we'll compute less
+# often.
 eval_prediction = tf.nn.softmax(model(eval_data))
 
-# Small utility function to evaluate a dataset by feeding batches of data to
-# {eval_data} and pulling the results from {eval_predictions}.
+# Small utility function to evaluate a dataset by feeding batches of
+# data to {eval_data} and pulling the results from {eval_predictions}.
 # Saves memory and enables this to run on smaller GPUs.
 def eval_in_batches(data, sess):
-  """Get all predictions for a dataset by running it in small batches."""
+  """Get predictions for a dataset by running it in small batches."""
   size = data.shape[0]
   if size < EVAL_BATCH_SIZE:
-    raise ValueError("batch size for evals larger than dataset: %d" % size)
-  predictions = numpy.ndarray(shape=(size, NUM_LABELS), dtype=numpy.float32)
+    raise ValueError("batch size for evals larger than dataset: %d"
+                     % size)
+  predictions = numpy.ndarray(shape=(size, NUM_LABELS),
+                              dtype=numpy.float32)
   for begin in xrange(0, size, EVAL_BATCH_SIZE):
     end = begin + EVAL_BATCH_SIZE
     if end <= size:
@@ -248,7 +268,6 @@ start_time = time.time()
 with tf.Session() as sess:
   # Run all the initializers to prepare the trainable parameters.
   tf.global_variables_initializer().run()
-  print('Initialized!')
   # Loop through training steps.
   for step in xrange(int(num_epochs * train_size) // BATCH_SIZE):
     # Compute the offset of the current minibatch in the data.
@@ -265,7 +284,8 @@ with tf.Session() as sess:
     # print some extra information once reach the evaluation frequency
     if step % EVAL_FREQUENCY == 0:
       # fetch some extra nodes' data
-      l, lr, predictions = sess.run([loss, learning_rate, train_prediction],
+      l, lr, predictions = sess.run([loss, learning_rate,
+                                     train_prediction],
                                     feed_dict=feed_dict)
       elapsed_time = time.time() - start_time
       start_time = time.time()
@@ -273,10 +293,12 @@ with tf.Session() as sess:
             (step, float(step) * BATCH_SIZE / train_size,
              1000 * elapsed_time / EVAL_FREQUENCY))
       print('Minibatch loss: %.3f, learning rate: %.6f' % (l, lr))
-      print('Minibatch error: %.1f%%' % error_rate(predictions, batch_labels))
+      print('Minibatch error: %.1f%%'
+            % error_rate(predictions, batch_labels))
       print('Validation error: %.1f%%' % error_rate(
           eval_in_batches(validation_data, sess), validation_labels))
       sys.stdout.flush()
   # Finally print the result!
-  test_error = error_rate(eval_in_batches(test_data, sess), test_labels)
+  test_error = error_rate(eval_in_batches(test_data, sess),
+                          test_labels)
   print('Test error: %.1f%%' % test_error)

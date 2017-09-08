@@ -7,43 +7,7 @@ import numpy as np
 import tensorflow as tf
 import deepchem as dc
 from environment import TicTacToeEnvironment
-#from a3c import Layer
-#from a3c import Adam
-#from a3c import Dense
-#from a3c import Squeeze
-#from a3c import BatchNorm
-#from a3c import Flatten
-#from a3c import SoftMax
 from a3c import A3C
-
-
-#class TicTacToePolicy(dc.rl.Policy):
-#  def create_layers(self, state, **kwargs):
-#    d1 = Flatten(in_layers=state)
-#    d2 = Dense(
-#        in_layers=[d1],
-#        activation_fn=tf.nn.relu,
-#        normalizer_fn=tf.nn.l2_normalize,
-#        normalizer_params={"dim": 1},
-#        out_channels=64)
-#    d3 = Dense(
-#        in_layers=[d2],
-#        activation_fn=tf.nn.relu,
-#        normalizer_fn=tf.nn.l2_normalize,
-#        normalizer_params={"dim": 1},
-#        out_channels=32)
-#    d4 = Dense(
-#        in_layers=[d3],
-#        activation_fn=tf.nn.relu,
-#        normalizer_fn=tf.nn.l2_normalize,
-#        normalizer_params={"dim": 1},
-#        out_channels=16)
-#    d4 = BatchNorm(in_layers=[d4])
-#    d5 = Dense(in_layers=[d4], activation_fn=None, out_channels=9)
-#    value = Dense(in_layers=[d4], activation_fn=None, out_channels=1)
-#    value = Squeeze(squeeze_dims=1, in_layers=[value])
-#    probs = SoftMax(in_layers=[d5])
-#    return {'action_prob': probs, 'value': value}
 
 
 def eval_tic_tac_toe(value_weight,

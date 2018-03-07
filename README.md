@@ -1,4 +1,8 @@
 # The Book
 Deep Learning with TensorFlow
 
-![Book Cover](/book cover.png?raw=true)
+<center>
+
+![Book Cover](https://pbs.twimg.com/media/DXQHXOtVoAEO4T_.jpg:large)
+
+</center>

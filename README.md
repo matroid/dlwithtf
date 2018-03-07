@@ -1,5 +1,6 @@
-# The Book
-Deep Learning with TensorFlow
+# Deep Learning with TensorFlow Companion Code
+Referenced throughout the book.
+
 
 <center>
 

@@ -1,4 +1,4 @@
-# Deep Learning with TensorFlow Companion Code
+# TensorFlow for Deep Learning Companion Code
 Referenced throughout the book.
 
 

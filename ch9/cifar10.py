@@ -40,7 +40,7 @@ import re
 import sys
 import tarfile
 
-from six.moves import urllib
+from six.moves import urllib, xrange # pylint: disable=redefined-builtin
 import tensorflow as tf
 
 import cifar10_input

@@ -38,9 +38,10 @@ with tf.name_scope("layer-1"):
 with tf.name_scope("output"):
   W = tf.Variable(tf.random_normal((n_hidden, 1)))
   b = tf.Variable(tf.random_normal((1,)))
-  y_pred = tf.matmul(x_1, W) + b
+  y_pred = tf.transpose(tf.matmul(x_1, W) + b)
 with tf.name_scope("loss"):
-  l = tf.reduce_sum((y - y_pred)**2)
+  lvec = (y - y_pred)**2
+  l = tf.reduce_sum(lvec)
 with tf.name_scope("optim"):
   train_op = tf.train.AdamOptimizer(.001).minimize(l)
 
@@ -50,14 +51,14 @@ with tf.name_scope("summaries"):
 
 train_writer = tf.summary.FileWriter('/tmp/fcnet-regression-train', tf.get_default_graph())
 
-n_steps = 200
+n_steps = 1000
 with tf.Session() as sess:
   sess.run(tf.global_variables_initializer())
   # Train model
   for i in range(n_steps):
     feed_dict = {x: x_np, y: y_np}
-    _, summary, loss = sess.run([train_op, merged, l], feed_dict=feed_dict)
-    print("step %d, loss: %f" % (i, loss))
+    _, summary, loss, lossvec = sess.run([train_op, merged, l, lvec], feed_dict=feed_dict)
+    print("step %d, loss: %f, loss-vec-size: %s" % (i, loss, lossvec.shape))
     train_writer.add_summary(summary, i)
 
   # Make Predictions
@@ -81,5 +82,6 @@ plt.xlabel("X")
 plt.ylabel("Y")
 plt.title("Predicted versus true values")
 plt.xlim(0, 1)
+plt.scatter(x_np, y_np)
 plt.scatter(x_np, y_pred_np)
 plt.savefig("fcnet_regression_learned.png")

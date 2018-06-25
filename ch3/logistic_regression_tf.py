@@ -1,6 +1,6 @@
 import numpy as np
 np.random.seed(456)
-import  tensorflow as tf
+import tensorflow as tf
 tf.set_random_seed(456)
 import matplotlib.pyplot as plt
 from sklearn.metrics import accuracy_score
@@ -10,12 +10,12 @@ from scipy.special import logit
 N = 100
 # Zeros form a Gaussian centered at (-1, -1)
 x_zeros = np.random.multivariate_normal(
-    mean=np.array((-1, -1)), cov=.1*np.eye(2), size=(N/2,))
-y_zeros = np.zeros((N/2,))
+    mean=np.array((-1, -1)), cov=.1*np.eye(2), size=(N//2,))
+y_zeros = np.zeros((N//2,))
 # Ones form a Gaussian centered at (1, 1)
 x_ones = np.random.multivariate_normal(
-    mean=np.array((1, 1)), cov=.1*np.eye(2), size=(N/2,))
-y_ones = np.ones((N/2,))
+    mean=np.array((1, 1)), cov=.1*np.eye(2), size=(N//2,))
+y_ones = np.ones((N//2,))
 
 x_np = np.vstack([x_zeros, x_ones])
 y_np = np.concatenate([y_zeros, y_ones])

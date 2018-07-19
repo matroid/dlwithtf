@@ -46,7 +46,7 @@ with tf.name_scope("weights"):
 with tf.name_scope("prediction"):
   y_pred = tf.matmul(x, W) + b
 with tf.name_scope("loss"):
-  l = tf.reduce_sum((y - y_pred)**2)
+  l = tf.reduce_sum((y - tf.squeeze(y_pred))**2)
 with tf.name_scope("optim"):
   train_op = tf.train.AdamOptimizer(.001).minimize(l)
 
